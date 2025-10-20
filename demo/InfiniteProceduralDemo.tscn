@@ -1,0 +1,32 @@
+[gd_scene load_steps=6 format=3 uid="uid://cofnhdcclon1w"]
+
+[ext_resource type="Script" uid="uid://t4mllqnvgu2r" path="res://demo/src/InfiniteProceduralDemo.gd" id="1_dqxbu"]
+[ext_resource type="PackedScene" uid="uid://bb2lp50sjndus" path="res://demo/components/Environment.tscn" id="2_y0oi6"]
+[ext_resource type="PackedScene" uid="uid://domhm87hbhbg1" path="res://demo/components/Player.tscn" id="3_8ognr"]
+[ext_resource type="PackedScene" uid="uid://d2jihfohphuue" path="res://demo/components/UI.tscn" id="4_x5jjk"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_dqxbu"]
+frequency = 0.0001
+fractal_octaves = 6
+fractal_lacunarity = 2.5
+fractal_gain = 0.3
+
+[node name="InfiniteProceduralDemo" type="Node"]
+script = ExtResource("1_dqxbu")
+noise = SubResource("FastNoiseLite_dqxbu")
+
+[node name="Environment" parent="." instance=ExtResource("2_y0oi6")]
+
+[node name="Player" parent="." instance=ExtResource("3_8ognr")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 50, 0)
+
+[node name="UI" parent="." instance=ExtResource("4_x5jjk")]
+
+[node name="RunThisSceneLabel3D" type="Label3D" parent="."]
+pixel_size = 0.001
+billboard = 1
+no_depth_test = true
+fixed_size = true
+text = "Run This Scene"
+font_size = 64
+outline_size = 10
