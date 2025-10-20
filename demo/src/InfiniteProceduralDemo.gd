@@ -17,7 +17,7 @@ var region_distance := region_size * vertex_spacing ## Distance between Regions 
 ## RAM, making reloading previously visited Regions much faster. However, this can quickly occupy 
 ## gigabytes of memory (depending on the Region parameters and Player speed, as well as the 
 ## cache_full_regions parameter).
-@export var unload_cache := true
+@export var unload_cache := false
 ## Whether to cache the full Terrain3DRegion instances. If false, only the generated heightmaps are
 ## cached. Compromise between speed and RAM usage. Has no significant effect when unload_cache is 
 ## enabled.
