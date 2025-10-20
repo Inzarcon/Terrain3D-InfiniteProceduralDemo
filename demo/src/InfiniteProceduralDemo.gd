@@ -167,8 +167,8 @@ func _update_region(task_index: int) -> void:
 ## Generate and return heightmap for the given virtual_location.
 ## NOTE: Inefficient compared to C++, but good enough for this demo.
 func generate_heightmap(virtual_location: Vector2i) -> Image:
-	var noise_offset_x := virtual_location.x * region_size * vertex_spacing
-	var noise_offset_y := virtual_location.y * region_size * vertex_spacing
+	var noise_offset_x := virtual_location.x * region_distance
+	var noise_offset_y := virtual_location.y * region_distance
 	
 	var img: Image = Image.create_empty(region_size, region_size, false, Image.FORMAT_RF)
 	for x in region_size:
