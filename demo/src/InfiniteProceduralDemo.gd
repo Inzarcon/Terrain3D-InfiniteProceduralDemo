@@ -17,13 +17,17 @@ var region_distance := region_size * vertex_spacing ## Distance between Regions 
 ## RAM, making reloading previously visited Regions much faster. However, this can quickly occupy 
 ## gigabytes of memory (depending on the Region parameters and Player speed, as well as the 
 ## cache_full_regions parameter).
-@export var unload_cache := false
+@export var unload_cache := true
 ## Whether to cache the full Terrain3DRegion instances. If false, only the generated heightmaps are
 ## cached. Compromise between speed and RAM usage. Has no significant effect when unload_cache is 
 ## enabled.
 @export var cache_full_regions := false
-## Whether region heightmaps should be exported to and imported from disk.
-@export var save_to_disk := false
+## Whether Region heightmaps should be exported to and imported from disk. This can be as fast as
+## loading heightmaps from the runtime Cache with cache_full_regions disabled, depending on the
+## speed of the storage drive. However, enabling cache_full_regions is still by far the fastest.
+## NOTE: Don't forget to clear the data when changing terrain generation parameters, or set a
+## different directory!
+@export var save_to_disk := true
 ## Directory for heightmap export/import. Exporting also creates the directory if it does not exist.
 @export var save_location := "res://demo/data/"
 
@@ -136,16 +140,11 @@ func update_regions() -> void:
 				tasks.append([location, virtual_location, "from_cache"])
 				cached += 1
 				dropped_regions.erase(virtual_location)
-			elif false: # elif saved_exists(virtual_location):
-				pass
-				# NOTE: Disabled for now due to requiring change in Terrain3D C++ code.
-				# TODO: Make this work without needing plugin modification.
-				# TODO: Convert to WorkerThreadPool task.
-				# data.load_region(location, virtual_to_filename(virtual_location), false)
-				# var region = data.get_region(location)
-				# cached_regions[virtual_location] = region
-				# loaded += 1
-				# $UI.loaded_count += 1
+			elif save_to_disk and saved_exists(virtual_location):
+				tasks.append([location, virtual_location, "from_disk"])
+				loaded += 1
+				$UI.loaded_count += 1
+				dropped_regions.erase(virtual_location)
 			else:
 				tasks.append([location, virtual_location, "generate"])
 				generated += 1
@@ -164,24 +163,35 @@ func _update_region(task_index: int) -> void:
 	var virtual_location = task[1]
 	var type = task[2]
 	
-	if type == "generate":
-		var heightmap: Image = generate_heightmap(virtual_location)
-		var region := create_region(location, heightmap)
-		
-		# TODO: Consider thread-safe storage which doesn't require Mutex.
-		mutex.lock()
-		if cache_full_regions:
-			cached_regions[virtual_location] = region
-		else:
-			cached_heightmaps[virtual_location] = heightmap
-			
-		mutex.unlock()
-		
-		print("Generated Region ", str(virtual_location), ".")
-		
-	elif type == "from_cache":
+	if type == "from_cache":
 		load_region_from_cache(location, virtual_location) # Read-Only -> No Mutex is faster.
 		print("Loaded Region ", str(virtual_location), " from Cache.")
+		return
+		
+	var heightmap: Image
+	var msg: String
+	if type == "from_disk":
+		heightmap = ResourceLoader.load(virtual_to_filename(virtual_location))
+		msg = "Loaded Region " + str(virtual_location) + " from disk."
+	elif type == "generate":
+		heightmap = generate_heightmap(virtual_location)
+		msg = "Generated Region " + str(virtual_location) + "."
+		if save_to_disk:
+			if not DirAccess.dir_exists_absolute(save_location):
+				DirAccess.make_dir_absolute(save_location)
+			ResourceSaver.save(heightmap, virtual_to_filename(virtual_location))
+		
+	var region := create_region(location, heightmap)
+
+	# TODO: Consider thread-safe storage which doesn't require Mutex.
+	mutex.lock()
+	if cache_full_regions:
+		cached_regions[virtual_location] = region
+	else:
+		cached_heightmaps[virtual_location] = heightmap
+	mutex.unlock()
+
+	print(msg)
 
 ## Creates, adds and returns a new region for the given location and heightmap.
 func create_region(location: Vector2i, heightmap: Image) -> Terrain3DRegion:
@@ -241,6 +251,16 @@ func _update_regions() -> void:
 	shift_lock = false
 	print(shift_text)
 
+## Translate virtual location to Region file name.
+## NOTE: Not used since saving to disk is disabled in this version.
+func virtual_to_filename(virtual_location: Vector2i) -> String:
+	return save_location + str(virtual_location.x) + "_" +  str(virtual_location.y) + ".res"
+
+## Check if the Region file for the given virtual location exists.
+## NOTE: Not used since saving to disk is disabled in this version.
+func saved_exists(virtual_location: Vector2i) -> bool:
+	return ResourceLoader.exists(virtual_to_filename(virtual_location))
+
 ## Mostly the same as original with minor changes and moving out the heightmap generation part.
 func create_terrain() -> Terrain3D:
 	var rock_gr := Gradient.new()
@@ -284,17 +304,6 @@ func create_terrain() -> Terrain3D:
 	terrain.region_size = region_size as Terrain3D.RegionSize
 
 	return terrain
-
-## Translate virtual location to Region file name.
-## NOTE: Not used since saving to disk is disabled in this version.
-func virtual_to_filename(virtual_location: Vector2i) -> String:
-	return "./demo/data/" + str(virtual_location.x) + "_" +  str(virtual_location.y) + ".res"
-
-## Check if the Region file for the given virtual location exists.
-## NOTE: Not used since saving to disk is disabled in this version.
-func saved_exists(virtual_location: Vector2i) -> bool:
-	return ResourceLoader.exists(virtual_to_filename(virtual_location))
-
 
 ## Same as original.
 func create_texture_asset(asset_name: String, gradient: Gradient, texture_size: int = 512) -> Terrain3DTextureAsset:
