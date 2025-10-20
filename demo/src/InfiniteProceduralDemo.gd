@@ -1,18 +1,18 @@
 extends Node
 
-# Region parameters
+@export_group("Region Settings")
 @export var region_size := 1024 ## Terrain3D Region size in heightmap pixels/vertices. Must be power of 2 and max 2048.
 @export var vertex_spacing := 10.0 ## Terrain3D vertex_spacing.
 var region_distance := region_size * vertex_spacing ## Distance between Regions in units/meters.
 @export var region_limit := 4 ## How many Regions to generate/load in each direction around the current Origin.
 @export var region_shift_limit := 2 ## How many Regions the Player can move from Origin before triggering Origin Shift.
 
-# Heightmap parameters
+@export_group("Heightmap Generation")
 @export var noise := FastNoiseLite.new() ## FastNoiseLite instance for heightmap generation.
 @export var heightmap_offset := 0  ## Heightmap Y offset.
 @export var heightmap_scale := 2000 ## Heightmap Y scale.
 
-# Caching and Saving configuration
+@export_group("Data Storage")
 ## Whether to drop inactive Regions from RAM Cache. If false, all once loaded Regions are kept in 
 ## RAM, making reloading previously visited Regions much faster. However, this can quickly occupy 
 ## gigabytes of memory (depending on the Region parameters and Player speed, as well as the 
