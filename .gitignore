@@ -9,8 +9,9 @@ export_credentials.cfg
 *.tmp
 *.temp
 
-# Local addons
+# Project specific
 addons/
+data/
 
 # Imported translations (automatically generated from CSV files)
 *.translation
