@@ -12,6 +12,21 @@ var region_distance := region_size * vertex_spacing ## Distance between Regions 
 @export var heightmap_offset := 0  ## Heightmap Y offset.
 @export var heightmap_scale := 2000 ## Heightmap Y scale.
 
+# Caching and Saving configuration
+## Whether to drop inactive Regions from RAM Cache. If false, all once loaded Regions are kept in 
+## RAM, making reloading previously visited Regions much faster. However, this can quickly occupy 
+## gigabytes of memory (depending on the Region parameters and Player speed, as well as the 
+## cache_full_regions parameter).
+@export var unload_cache := true
+## Whether to cache the full Terrain3DRegion instances. If false, only the generated heightmaps are
+## cached. Compromise between speed and RAM usage. Has no significant effect when unload_cache is 
+## enabled.
+@export var cache_full_regions := true
+## Whether region heightmaps should be exported to and imported from disk.
+@export var save_to_disk := false
+## Directory for heightmap export/import. Exporting also creates the directory if it does not exist.
+@export var save_location := "res://demo/data/"
+
 # Current Locations
 var relative_origin := Vector2i(0, 0) ## Which virtual Region location is the current real origin.
 var player_region := Vector2i(0, 0) ## Real Region location the Player is in.
@@ -20,17 +35,13 @@ var player_region := Vector2i(0, 0) ## Real Region location the Player is in.
 var terrain: Terrain3D
 var data: Terrain3DData
 
-# Threading and Caching
+# Threading, Caching and Saving
 var mutex := Mutex.new()
 var tasks
 var group_id
 var cached_regions := {} ## Region instances with their virtual locations as keys.
+var cached_heightmaps := {} ## Like cached_regions, but for heightmaps when cache_full_regions is false.
 var shift_lock := false ## Don't shift if there is already an Origin Shift getting processed.
-
-## Whether to drop inactive Regions from RAM cache. If false, all once loaded Regions are kept in 
-## RAM, making reloading previously visited Regions much faster. However, this can quickly occupy 
-## gigabytes of memory (depending on the Region parameters and Player speed).
-const UNLOAD_CACHE := true
 
 # Stats about latest Origin Shift
 var shift_start_ms: int ## For benchmarking time an Origin Shift takes.
@@ -58,14 +69,19 @@ func _ready() -> void:
 
 	region_origin_shift(Vector2i(0, 0)) # Trigger creating initial Terrain around true Origin.
 
+## Loads a region/heightmap from cache, depending on cache_full_regions.
 func load_region_from_cache(location: Vector2i, virtual_location: Vector2i) -> void:
-	var region = cached_regions.get(virtual_location)
-	if region == null:
-		push_error(
-			"Loaded region from cache for virtual location " 
-			+ str(virtual_location) + " is null. Ignoring.")
-	region.location = location
-	data.add_region(region, false)
+	if cache_full_regions:
+		var region = cached_regions.get(virtual_location)
+		if region == null:
+			push_error(
+				"Loaded region from cache for virtual location " 
+				+ str(virtual_location) + " is null. Ignoring.")
+		region.location = location
+		data.add_region(region, false)
+	else:
+		var heightmap = cached_heightmaps.get(virtual_location)
+		create_region(location, heightmap)
 
 ## Checks if a location is within the given Region distance border away from true Origin.
 func is_within_borders(location: Vector2i, border: int = 4) -> bool:
@@ -105,16 +121,18 @@ func update_regions() -> void:
 	cached = 0
 	tasks = []
 	
+	var cache = cached_regions if cache_full_regions else cached_heightmaps
+	
 	var dropped_regions = {}
-	if UNLOAD_CACHE:
-		for virtual_location in cached_regions.keys():
+	if unload_cache:
+		for virtual_location in cache.keys():
 			dropped_regions[virtual_location] = null # Emulate HashSet
 	
 	for x in range(-region_limit, region_limit): 
 		for y in range(-region_limit, region_limit):
 			var location = Vector2i(x, y)
 			var virtual_location = location + relative_origin
-			if cached_regions.has(virtual_location):
+			if cached_regions.has(virtual_location) or cached_heightmaps.has(virtual_location):
 				tasks.append([location, virtual_location, "from_cache"])
 				cached += 1
 				dropped_regions.erase(virtual_location)
@@ -133,9 +151,9 @@ func update_regions() -> void:
 				generated += 1
 				$UI.loaded_count += 1
 	
-	if UNLOAD_CACHE:
+	if unload_cache:
 		for virtual_location in dropped_regions:
-			cached_regions.erase(virtual_location)
+			cache.erase(virtual_location)
 			$UI.loaded_count -= 1
 	_run_tasks()
 
@@ -147,15 +165,16 @@ func _update_region(task_index: int) -> void:
 	var type = task[2]
 	
 	if type == "generate":
-		var img: Image = generate_heightmap(virtual_location)
-		var region := Terrain3DRegion.new()
-		region.location = location
-		region.set_map(Terrain3DRegion.TYPE_HEIGHT, img)
-		data.add_region(region, false)
+		var heightmap: Image = generate_heightmap(virtual_location)
+		var region := create_region(location, heightmap)
 		
 		# TODO: Consider thread-safe storage which doesn't require Mutex.
 		mutex.lock()
-		cached_regions[virtual_location] = data.get_region(location)
+		if cache_full_regions:
+			cached_regions[virtual_location] = region
+		else:
+			cached_heightmaps[virtual_location] = heightmap
+			
 		mutex.unlock()
 		
 		print("Generated Region ", str(virtual_location), ".")
@@ -163,6 +182,16 @@ func _update_region(task_index: int) -> void:
 	elif type == "from_cache":
 		load_region_from_cache(location, virtual_location) # Read-Only -> No Mutex is faster.
 		print("Loaded Region ", str(virtual_location), " from Cache.")
+
+## Creates, adds and returns a new region for the given location and heightmap.
+func create_region(location: Vector2i, heightmap: Image) -> Terrain3DRegion:
+	# NOTE: Might be what causes no difference in RAM usage when storing only heightmaps
+	#       -> Loaded region not updated?
+	var region := Terrain3DRegion.new()
+	region.location = location
+	region.set_map(Terrain3DRegion.TYPE_HEIGHT, heightmap)
+	data.add_region(region, false)
+	return region
 
 ## Generate and return heightmap for the given virtual_location.
 ## NOTE: Inefficient compared to C++, but good enough for this demo.

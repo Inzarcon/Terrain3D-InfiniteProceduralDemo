@@ -21,7 +21,7 @@ func _process(_p_delta) -> void:
 		var relative_origin = get_parent().relative_origin
 		virtual_pos = player.global_position + Vector3(relative_origin.x * 1024, 0, relative_origin.y * 1024)
 		virtual_loc = terrain.data.get_region_location(player.global_position) + relative_origin
-		unload = get_parent().UNLOAD_CACHE
+		unload = get_parent().unload_cache
 		
 	if(visible_mode == 1):
 		$Label.text += "Move Speed: %.1f\n" % player.MOVE_SPEED if player else ""
