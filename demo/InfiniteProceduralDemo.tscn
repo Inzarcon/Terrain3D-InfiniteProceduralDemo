@@ -14,7 +14,6 @@ fractal_gain = 0.3
 [node name="InfiniteProceduralDemo" type="Node"]
 script = ExtResource("1_dqxbu")
 noise = SubResource("FastNoiseLite_dqxbu")
-cache_full_regions = false
 
 [node name="Environment" parent="." instance=ExtResource("2_y0oi6")]
 

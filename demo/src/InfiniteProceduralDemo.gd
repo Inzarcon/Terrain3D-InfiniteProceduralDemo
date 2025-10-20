@@ -21,7 +21,7 @@ var region_distance := region_size * vertex_spacing ## Distance between Regions 
 ## Whether to cache the full Terrain3DRegion instances. If false, only the generated heightmaps are
 ## cached. Compromise between speed and RAM usage. Has no significant effect when unload_cache is 
 ## enabled.
-@export var cache_full_regions := true
+@export var cache_full_regions := false
 ## Whether region heightmaps should be exported to and imported from disk.
 @export var save_to_disk := false
 ## Directory for heightmap export/import. Exporting also creates the directory if it does not exist.
