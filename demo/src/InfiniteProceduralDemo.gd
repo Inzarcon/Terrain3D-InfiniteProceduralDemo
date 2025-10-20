@@ -81,7 +81,7 @@ func _process(_delta: float) -> void:
 		return
 	player_region = cur_region
 	
-	if not is_within_borders(cur_region, 2):
+	if not is_within_borders(cur_region, region_shift_limit):
 		region_origin_shift(cur_region)
 		
 ## Shifts the loaded Regions and Player position so that the current Region is the new (0, 0).
